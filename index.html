@@ -1,0 +1,345 @@
+<!DOCTYPE html PUBLIC "-//W3C//Ddiv XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/Ddiv/xhtml1-strict.ddiv">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+
+  <head>
+    <title>CS 194 PROJECT 4</title>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <link href="style.css" rel="stylesheet" />
+  </head>
+
+  <body>
+    <header>
+      <h1>CS 194-26: Intro to Computer Vision and Computational Photography, Fall 2021</h1>
+      <h1>Project 4A: Image Warping and Mosaicing</h1>
+      <h2>By Xinyun Cao</h2>
+
+      <div class="table-of-contents">
+        <ul>
+          <li>
+            <a href="#part1">A-1 Shoot the Pictures</a>
+          </li>
+          <li>
+            <a href="#part2">A-2 Recover Homographies</a>
+          </li>
+          <li>
+            <a href="#part3">A-3 Warp the Images</a>
+          </li>
+          <li>
+            <a href="#part4">A-4 Image Rectification</a>
+          </li>
+          <li>
+            <a href="#part5">A-5 Blend the images into a mosaic</a>
+          </li>
+          <li>
+            <a href="#part6">PartA: What I learned</a>
+          </li>
+        </ul>
+      </div>
+      <!-- end table of contents -->
+    </header>
+    <!-- END PAGE HEADER -->
+
+    <br class="spacer" />
+
+    <!-- START PAGE CONTENT -->
+    <div class="content">
+      <div class="part" id="overview">
+        <h2>Overview</h2>
+        <!-- Give a high-level overview of what you implemented in this project. Think about what you've built as a whole.
+              Share your thoughts on what interesting things you've learned from completing the project. -->
+        <p>In the first part of this project, we used homographies to combine images into paronamas.</p>
+      </div>
+      <!-- END OVERVIEW -->
+
+      <!--Start Part 1-->
+      <div class="part" id="part1">
+        <h2>A-1 Shoot the Pictures</h2>
+        <p>First, I shoot the pictures following the guidelines. I shot three sets. First a faraway scene(the scene on the top of my roof), then a medium-distanced scene(in my back yard), then a set of relatively close shots in dim lighting(in my bedroom at night). The original images are shown below.</p>
+        <p>Note: I forgot to turn on the AE/AF lock when taking the faraway scene picture. So the exposure were a bit different among the pictures.</p>
+        <h4>Result Pictures</h4>
+        <div class="row">
+          <div class="column">
+            <img src="input/s1_1.jpg" alt="s1_1" style="width:100%">
+            <figcaption>scene 1, pic 1</figcaption>
+          </div>
+          <div class="column">
+            <img src="input/s1_2.jpg" alt="s1_2" style="width:100%">
+            <figcaption>scene 1, pic 2</figcaption>
+          </div>
+          <div class="column">
+            <img src="input/s1_3.jpg" alt="s1_3" style="width:100%">
+            <figcaption>scene 1, pic 3</figcaption>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="column">
+            <img src="input/s2_1.jpg" alt="s2_1" style="width:100%">
+            <figcaption>scene 2, pic 1</figcaption>
+          </div>
+          <div class="column">
+            <img src="input/s2_2.jpg" alt="s2_2" style="width:100%">
+            <figcaption>scene 2, pic 2</figcaption>
+          </div>
+          <div class="column">
+            <img src="input/s2_3.jpg" alt="s2_3" style="width:100%">
+            <figcaption>scene 2, pic 3</figcaption>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="column">
+            <img src="input/s3_1.jpg" alt="s3_1" style="width:100%">
+            <figcaption>scene 3, pic 1</figcaption>
+          </div>
+          <div class="column">
+            <img src="input/s3_2.jpg" alt="s3_2" style="width:100%">
+            <figcaption>scene 3, pic 2</figcaption>
+          </div>
+          <div class="column">
+            <img src="input/s3_3.jpg" alt="s3_3" style="width:100%">
+            <figcaption>scene 3, pic 3</figcaption>
+          </div>
+        </div>
+      </div>
+      <!--End Part 1-->
+
+      <!--Start Part 2-->
+      <div class="part" id="part2">
+        <h2>A-2 Recover Homographies</h2>
+        <p>In this part, we manually selected corresponding keypoints between pictures, and then calculated homographies to project onw picture to the other using the formulas taught in class.</p>
+
+        <h4>Algorithm Explain</h4>
+        <p>First, we used <code>plt.ginput</code> similar to Project 2 and Project 3. I used 8 keypoints for each pair of pictures, and this value is set up as a variable that can be changed for later usages.</p>
+        <p>To warp an image from, say, projection defined by keypoint array <code>arr2</code> to a new projection defined by keypoint array <code>arr1</code>, we first want to calculate the homography from the destination shape <code>arr1</code> to the starting shape <code>arr2</code> (note: because we are using inverse warping).</p>
+        <p>Specifically, to calculate the homography, we take the formula we have from class:</p>
+        <div class="row">
+          <div class="column">
+            <img src="input/hom_1.png" alt="hom_1" style="width:100%">
+            <figcaption>Source: Lecture slides</figcaption>
+          </div>
+        </div>
+        <p>We can then break the matrix down, and stack the information from all <code>n = 8</code> points together to form the new matrix function:</p>
+        <div class="row">
+          <div class="column">
+            <img src="input/hom_2.png" alt="hom_2" style="width:100%">
+            <figcaption>Reference: https://towardsdatascience.com/estimating-a-homography-matrix-522c70ec4b2c</figcaption>
+          </div>
+        </div>
+        <p>The above formula can be rewritten as A*h = b, while h can be rewritten as the 3x3 homography by copying the first 8 values in order and adding 1 as H3_3. So we can just construct A and b using the above formula and the keypoints we selected in the previous step, and use <code>np.linalg.lstsq</code> to calculate the H value.</p>
+      </div>
+      <!--End Part2-->
+
+      <!--Start Part3-->
+      <div class="part" id="part3">
+        <h2>A-3 Warp the Images</h2>
+        <p>In this part, we warp the images to a certain position in a larger image that will form our final image</p>
+
+        <h4>Algorithm explain</h4>
+        <p>To warp the image, since we are using inverse warping, we need to apply the homography we calculated in previous part to points in the destination image, and then choose the best pixel value based on the value around the result point in the original source image. I used <code>cv2.remap</code> function here. For syntax and usage examples of this function, I referenced the documentation of this function: https://docs.opencv.org/3.0-beta/modules/imgproc/doc/geometric_transformations.html?highlight=remap#cv2.remap, as well as this thread: https://stackoverflow.com/questions/46520123/how-do-i-use-opencvs-remap-function. I did write all the code myself.</p>
+        <p>After warping the image to the new position, we can see below that the position of images are correct, but we would like the images to shift to the right a bit, since the images are larger after the projection transform, and we would like a larger image. As shown below, most of the leftmost image is actually cut off, and we don't want that.</p>
+        <div class="row">
+          <div class="column">
+            <img src="output/warp1.jpg" alt="warp1" style="width:100%">
+            <figcaption>scene1, pic1, after warping but no shifting</figcaption>
+          </div>
+        </div>
+        <div class="row">
+          <div class="column">
+            <img src="output/warp2.jpg" alt="warp2" style="width:100%">
+            <figcaption>scene1, pic2, after warping but no shifting</figcaption>
+          </div>
+        </div>
+        <div class="row">
+          <div class="column">
+            <img src="output/warp3.jpg" alt="warp3" style="width:100%">
+            <figcaption>scene1, pic3, after warping but no shifting</figcaption>
+          </div>
+        </div>
+
+        <p>The solution is to add a <code>dstSize</code> and <code>shift</code> variables to the <code>warpImage</code> function. We make the result image <code>dstSize</code> so that we can fit all the stretched images in, and we can shift ALL the images by <code>shift</code> amount to fit them in the new window. To shift the image, we can just subtract the shift amount to all <code>index_x</code> and <code>index_y</code> elements.</p>
+        <p>The result look like following:</p>
+        <div class="row">
+          <div class="column">
+            <img src="output/newWarp1.jpg" alt="newWarp1" style="width:100%">
+            <figcaption>scene 1, pic 1, warped and shifted</figcaption>
+          </div>
+          <div class="column">
+            <img src="output/warp2_1.jpg" alt="warp2_1" style="width:100%">
+            <figcaption>scene 2, pic 1, warped and shifted</figcaption>
+          </div>
+          <div class="column">
+            <img src="output/warp3_1.jpg" alt="warp3_1" style="width:100%">
+            <figcaption>scene 3, pic 1, warped and shifted</figcaption>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="column">
+            <img src="output/newWarp2.jpg" alt="newWarp2" style="width:100%">
+            <figcaption>scene 1, pic 2, warped and shifted</figcaption>
+          </div>
+          <div class="column">
+            <img src="output/warp2_2.jpg" alt="warp2_2" style="width:100%">
+            <figcaption>scene 2, pic 2, warped and shifted</figcaption>
+          </div>
+          <div class="column">
+            <img src="output/warp3_2.jpg" alt="warp3_2" style="width:100%">
+            <figcaption>scene 3, pic 2, warped and shifted</figcaption>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="column">
+            <img src="output/newWarp3.jpg" alt="newWarp3" style="width:100%">
+            <figcaption>scene 1, pic 3, warped and shifted</figcaption>
+          </div>
+          <div class="column">
+            <img src="output/warp2_3.jpg" alt="warp2_3" style="width:100%">
+            <figcaption>scene 2, pic 3, warped and shifted</figcaption>
+          </div>
+          <div class="column">
+            <img src="output/warp3_3.jpg" alt="warp3_3" style="width:100%">
+            <figcaption>scene 3, pic 3, warped and shifted</figcaption>
+          </div>
+        </div>
+
+      </div>
+      <!--End Part 3-->
+
+      <!--Start Part4-->
+      <div class="part" id="part4">
+        <h2>A-4 Image Rectification</h2>
+        <p>In this part, we try to "rectify" an image. Basically, we will wroite a program such that after choosing a plane in any image, we can use homography and warping to create a new image with that plane as frontal and in the middle, so that we can create the effect that we are looking at that surface directly from the front.</p>
+
+        <h4>Original image and plane chosen:</h4>
+        <div class="row">
+          <div class="column">
+            <img src="input/rec0.jpg" alt="rec0" style="width:100%">
+            <figcaption>swag from my company. I chose the book as the surface.</figcaption>
+          </div>
+          <div class="column">
+            <img src="output/rec_out0.jpg" alt="rec_out0" style="width:100%">
+            <figcaption>rectified using the book</figcaption>
+          </div>
+        </div>
+        <div class="row">
+          <div class="column">
+            <img src="input/rec1.jpg" alt="rec1" style="width:100%">
+            <figcaption>a photo I took in MIT. I chose a side of a structure as the surface.</figcaption>
+          </div>
+          <div class="column">
+            <img src="output/rec_out1.jpg" alt="rec_out0" style="width:100%">
+            <figcaption>rectified using the structure</figcaption>
+          </div>
+        </div>
+        <div class="row">
+          <div class="column">
+            <img src="input/rec2.jpg" alt="rec2" style="width:100%">
+            <figcaption>an indoor garden I visited in Boston, I chose the central tile as the surface.</figcaption>
+          </div>
+          <div class="column">
+            <img src="output/rec_out2.jpg" alt="rec_out2" style="width:100%">
+            <figcaption>rectified using the central tile</figcaption>
+          </div>
+        </div>
+        <div class="row">
+          <div class="column">
+            <img src="input/rec3.jpg" alt="rec3" style="width:100%">
+            <figcaption>a picture I took in a Boston museum. I chose the sheet of music as the surface.</figcaption>
+          </div>
+          <div class="column">
+            <img src="output/rec_out3.jpg" alt="rec_out3" style="width:100%">
+            <figcaption>rectified using the sheet of music</figcaption>
+          </div>
+        </div>
+      </div>
+      <!--End Part 4-->
+
+      <!--Start Part5-->
+      <div class="part" id="part5">
+        <h2>A-5 Blend the images into a mosaic</h2>
+        <p>In this part, I blended the warped images in previous parts together to form panoramas.</p>
+        <h4>Algorithm Explain</h4>
+        <p>As pointed out in lectures, simple piling up of the images could lead to an obvious edge in the panorama, which is obviously not ideal. I used a weighted average method using an alpha mask to achieve a smoother transition.</p>
+        <p>First, we make the three kinds of alpha mask in the original image space. I used <code>np.linspace</code> and <code>np.tile</code> functions to achieve linear fallback from the middle of the mask to the side of the mask.</p>
+        <p>In this part of the project, all the images I made are stiched together horizontally and span less than 180 degrees. So we only need 3 alpha mask. One for image on the left most, which only need fade out on the right side, One for the image on the right most, and one in the middle, with fade on both sides. The masks look like:</p>
+
+        <div class="row">
+          <div class="column">
+            <img src="output/mask_left.jpg" alt="mask_left" style="width:100%">
+            <figcaption>mask_left</figcaption>
+          </div>
+        </div>
+        <div class="row">
+          <div class="column">
+            <img src="output/mask_mid.jpg" alt="mask_left" style="width:100%">
+            <figcaption>mask_mid</figcaption>
+          </div>
+        </div>
+        <div class="row">
+          <div class="column">
+            <img src="output/mask_right.jpg" alt="mask_left" style="width:100%">
+            <figcaption>mask_right</figcaption>
+          </div>
+        </div>
+        <p>I then warped the masks using the same way we warped images in the previous part, and it looks like this. Note: we can also apply the mask and warp the images. But at this point I have the warped images already so I just went along with it.</p>
+        <div class="row">
+          <div class="column">
+            <img src="output/warp_mask_left.jpg" alt="warp_mask_left" style="width:100%">
+            <figcaption>warp_mask_left</figcaption>
+          </div>
+        </div>
+        <div class="row">
+          <div class="column">
+            <img src="output/warp_mask_mid.jpg" alt="warp_mask_mid" style="width:100%">
+            <figcaption>warp_mask_mid</figcaption>
+          </div>
+        </div>
+        <div class="row">
+          <div class="column">
+            <img src="output/warp_mask_right.jpg" alt="warp_mask_right" style="width:100%">
+            <figcaption>warp_mask_right</figcaption>
+          </div>
+        </div>
+
+        <p>Last but definitely not least, we element-wise multiply each warped image to their corresponding warped alpha masks, and adding them together to form the final image! Results shown below:</p>
+        <div class="row">
+          <div class="column">
+            <img src="output/alpha_result_1.jpg" alt="alpha_result_1" style="width:100%">
+            <figcaption>alpha_result_1</figcaption>
+          </div>
+        </div>
+        <div class="row">
+          <div class="column">
+            <img src="output/alpha_result_2.jpg" alt="alpha_result_2" style="width:100%">
+            <figcaption>alpha_result_2</figcaption>
+          </div>
+        </div>
+        <div class="row">
+          <div class="column">
+            <img src="output/alpha_result_3.jpg" alt="alpha_result_3" style="width:100%">
+            <figcaption>alpha_result_3</figcaption>
+          </div>
+        </div>
+      </div>
+      <p>Note: In the first result, there were some inconsistencies. Since they don't appear in the second and third image, I think it is because I didn't lock the exposure when taking the first scene, causing different images to have inconsistent brightness. It could also be because of the blending method.</p>
+      <!--End Part 5-->
+
+      <!--Start Part6-->
+      <div class="part" id="part6">
+        <h2>PartA: What I learned</h2>
+        <p>In this part of the project, I learned how to calculate homography and how to warp images using the homography to a different projection. This is very exciting. I managed to produce ok looking panoramas with the relative naive solution: manual point selection, no calibration and alpha channel general blending. I hope to improve this in Part B, to make it automatic and robust against error. I am also VERY interested in taking 360 panoramas and form a cylinder or even a ball, and export it to view in Virtual Reality. I think it is going to be very cool and I hope I can finish that for Bells and Whistles.</iframe>
+      </div>
+      <!--End Part6-->
+    </div>
+    <!-- END CONTENT -->
+
+    <hr />
+
+    <footer>
+      <a href="#">Back to top</a>
+    </footer>
+  </body>
+
+</html>
