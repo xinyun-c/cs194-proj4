@@ -33,6 +33,24 @@
           <li>
             <a href="#part6">PartA: What I learned</a>
           </li>
+          <li>
+            <a href="#partb-1">B-1 Detecting corner features in an image</a>
+          </li>
+          <li>
+            <a href="#partb-2">B-2 Extracting a Feature Descriptor for each feature point</a>
+          </li>
+          <li>
+            <a href="#partb-3">B-3 Matching these feature descriptors between two images</a>
+          </li>
+          <li>
+            <a href="#partb-4">B-4 Use a robust method (RANSAC) to compute a homography</a>
+          </li>
+          <li>
+            <a href="#partb-5">B-5 Produce new mosaics</a>
+          </li>
+          <li>
+            <a href="#partb-6">PartB: What I learned</a>
+          </li>
         </ul>
       </div>
       <!-- end table of contents -->
@@ -332,6 +350,131 @@
         <p>In this part of the project, I learned how to calculate homography and how to warp images using the homography to a different projection. This is very exciting. I managed to produce ok looking panoramas with the relative naive solution: manual point selection, no calibration and alpha channel general blending. I hope to improve this in Part B, to make it automatic and robust against error. I am also VERY interested in taking 360 panoramas and form a cylinder or even a ball, and export it to view in Virtual Reality. I think it is going to be very cool and I hope I can finish that for Bells and Whistles.</iframe>
       </div>
       <!--End Part6-->
+    </div>
+
+    <h1>PartB: FEATURE MATCHING for AUTOSTITCHING</h1>
+    <p>In this second part of the project, we automated the homography calculation process using feature destection and RANSAC algorithm.</p>
+      <!--End Part6-->
+
+      <div class="part" id="partb-1">
+        <h1>PartB-1: Detecting corner features in an image</h1>
+        <p>I used the provided skeleton code to calculate the Harris Corners. I set the min_distance to be 5 to reduce the amount of detected corners.</p>
+        <h4>Result:</h4>
+        <div class="row">
+          <div class="column">
+            <img src="output/harris_corner.jpg" alt="harris_corner" style="width:100%">
+            <figcaption>harris corner detection overlayed on the image</figcaption>
+          </div>
+        </div>
+
+        <p>After that, I used Adaptive Non-Maximal Suppression to choose the 150 points with the largest supression radius. That means those points are local maximum in the largest radius possible. I used the provided dist2 function to calculate the distance between each pair of detected coordinates, and assigned the radius based on the nearest neighbor that is larger than this point. We then simply find the first 150 points with the largest supression radius. To make the algorithm more robust, I also used c_robust = 0.9 to make sure the neighbor is definitely larger than the point.</p>
+        <h4>Result of Adaptive Non-Maximal Suppression:</h4>
+        <div class="row">
+          <div class="column">
+            <img src="output/anms_points.jpg" alt="anms_points" style="width:100%">
+            <figcaption>corners after ANMS overlayed on the image</figcaption>
+          </div>
+        </div>
+      </div>
+
+      <div class="part" id="partb-2">
+        <h1>PartB-2: Extracting a Feature Descriptor for each feature point</h1>
+        <p>Then, we try to extract a feature descriptor for each feature point result from the ANMS algorithm. To do that, I cropped out the 40 by 40 area next to every feature descriptor, then I blurred those 40 by 40 patches using gaussian filter. I then subsampled in that area to get the 8 by 8 feature descriptor.</p>
+        <h4>Example of  feature descriptor:</h4>
+        <div class="row">
+          <div class="column">
+            <img src="output/fourtyByFourty.jpg" alt="fourtyByFourty" style="width:100%">
+            <figcaption>A blurred 40 by 40 feature descriptor</figcaption>
+          </div>
+          <div class="column">
+            <img src="output/eightByEight.jpg" alt="eightByEight" style="width:100%">
+            <figcaption>A 8 by 8 feature descriptor after subdampling the 40 by 40 patch</figcaption>
+          </div>
+        </div>
+      </div>
+
+      <div class="part" id="partb-3">
+        <h1>PartB-3: Matching these feature descriptors between two images</h1>
+        <p>In section 3 of Part B, we want to match the feature descriptors we got in the previous sections between different images. To do that, I first calculated the SSD(Sum of Square Differences) between every pair of feature descriptors of the two images. For each descriptor of image 1, I choose the best and second best matching feature in image 2. If err(best) / err(second) is larger than the threshold, that means the two potential choices are too similar, and we reject both according to Lowe theory. Then I do the same thing on image 2 to get a list of image 2's best match.</p>
+        <p>After that, following symmetry principle, I picked all the pair of feature descriptors such that they are each other's top choice. This way, we can make sure there's minimum amount of error.</p>
+        <p>After studying the paper, I chose 0.6 for the threshold, as wrong matchings start to grow exponentially after this value.</p>
+        <h4>Result of Feature Matching:</h4>
+        <p>The red dots are feature points after using ANMS algorithm, and the blue points are the feature points chosen after running feature matching.</p>
+        <div class="row">
+          <div class="column">
+            <img src="output/feature_matching1.jpg" alt="feature_matching1" style="width:100%">
+            <figcaption>img 1 in the feature descriptor matching</figcaption>
+          </div>
+          <div class="column">
+            <img src="output/feature_matching2.jpg" alt="feature_matching2" style="width:100%">
+            <figcaption>img 2 in the feature descriptor matching</figcaption>
+          </div>
+        </div>
+      </div>
+
+      <div class="part" id="partb-4">
+        <h1>PartB-4: Use a robust method (RANSAC) to compute a homography</h1>
+        <p>In this section of Part B, I used RANSAC algorithm to choose the best homoraphy calculated from the points chosen in the feature matching algorithm.</p>
+        <p>In each RANSAC round, I chose 4 points at random, then I calculate the homography using these four points. Then, for each point in the starting image, we calculate the difference (using SSD as error) between the dot product of the new homography and the starting position, and the location of the corresponding point in the destination image. If the distance is smaller than a certain threshold, then we classify this point as a "inlier" for this specific 4 points.</p>
+        <p>I ran the RANSAC round 1000 times and chose the largest inlier set among all the rounds, and calculated the final homography using the largest inlier set.</p>
+        <h4>Result of RANSAC:</h4>
+        <p>The red dots are feature points after using ANMS algorithm, and the blue points are the feature points chosen after running feature matching. And then the yellow dots are remaining points after running RANSAC on the blue dots.</p>
+        <div class="row">
+          <div class="column">
+            <img src="output/ransac1.jpg" alt="ransac1" style="width:100%">
+            <figcaption>img 1 after running RANSAC</figcaption>
+          </div>
+          <div class="column">
+            <img src="output/ransac2.jpg" alt="ransac2" style="width:100%">
+            <figcaption>img 2 after running RANSAC</figcaption>
+          </div>
+        </div>
+      </div>
+
+      <div class="part" id="partb-5">
+        <h1>PartB-5: Produce new mosaics</h1>
+        <p>Using the auto homography calculation in Part B and the mosaic method in part A, I produced new mosaics. They are shown below, along with the old images produced by manual stitching.</p>
+        <h4>Result:</h4>
+        <div class="row">
+          <div class="column">
+            <img src="output/alpha_result_1.jpg" alt="alpha_result_1" style="width:100%">
+            <figcaption>scene 1, manual</figcaption>
+          </div>
+          <div class="column">
+            <img src="output/auto_scene1.jpg" alt="auto_scene1" style="width:100%">
+            <figcaption>scene 1, auto</figcaption>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="column">
+            <img src="output/alpha_result_2.jpg" alt="alpha_result_2" style="width:100%">
+            <figcaption>scene 2, manual</figcaption>
+          </div>
+          <div class="column">
+            <img src="output/auto_scene2.jpg" alt="auto_scene2" style="width:100%">
+            <figcaption>scene 2, auto</figcaption>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="column">
+            <img src="output/alpha_result_3.jpg" alt="alpha_result_3" style="width:100%">
+            <figcaption>scene 3, manual</figcaption>
+          </div>
+          <div class="column">
+            <img src="output/auto_scene3.jpg" alt="auto_scene3" style="width:100%">
+            <figcaption>scene 3, auto</figcaption>
+          </div>
+        </div>
+      </div>
+
+      <div class="part" id="partb-6">
+        <h1>PartB-6: What I learned in Part B</h1>
+        <p>First of all, don't procastinate TvT</p>
+        <p>I think auto feature matching is really cool! In part A, my least favorite part is marking out all the feature points. It was very tedius, and one single mistake can mess up the whole result. I really love how this new auto stitching program can be applied to all the different images and that I nenver need to manually mark it out again.</p>
+        <p>This also makes me imagine other possibilities. In Project 3, I really hated marking out human facial features by hand. I wonder if we can use similar feature matching algorithms to extract and match human facial features. I think that would be a very efficient and interesting project.</p>
+      </div>
     </div>
     <!-- END CONTENT -->
 
